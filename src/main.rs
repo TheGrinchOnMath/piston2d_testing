@@ -1,46 +1,73 @@
-
-
-mod render;
-mod physics;
 mod io;
+mod physics;
+//mod render;
 
 extern crate piston_window;
 
-use std::process::exit;
+use crate::physics::{Mirror, Ray};
 use piston_window::*;
+use std::process::exit;
 
 fn main() {
     let opengl = OpenGL::V3_2;
-    let mut window: PistonWindow = WindowSettings::new("shapes", [512; 2])
+    let mut window: PistonWindow = WindowSettings::new("piston2d", [800;2])
         .exit_on_esc(true)
         .graphics_api(opengl)
         .build()
         .unwrap();
     window.set_lazy(true);
+    
+    let mut reflection_count = 0;
     // init mouse pos by setting it to the middle of the window
-    let mut mouse_pos:[f64;2] = [window.size().width, window.size().height];
+    let mut mouse_pos: [f64; 2] = [window.size().width, window.size().height];
     // init reset variable. this will be used to trigger the rays be deleted
     let mut reset = true;
     // init rays, mirrors vectors. they contain the rays and mirrors.
     // mirrors are loaded from a json file, rays are generated from cursor position
-    let mut rays:Vec<physics::Ray>;
-    let mirrors = io::read_json("./assets/file.json");
+    let mut rays: Vec<Ray>;
+    let mirrors: Vec<Mirror> = generate_mirrors(
+        "assets/mirrors.json",
+        [window.size().width, window.size().height],
+    );
     let ray_count = 11;
-    // this might be stupid, and it probably is, but hey! 
+    // this might be stupid, and it probably is, but hey!
     // big vec of all the generated rays after each reset. might make a lot of memory be used.
-    let mut big_ray_buffer:Vec<physics::Ray> = vec![];
+    let mut big_ray_buffer: Vec<Ray> = vec![];
     // generate very first set of rays
     rays = physics::generate_rays(physics::Vector2::new_from_array(mouse_pos), ray_count);
+    let mut draw_rays: Vec<Ray> = vec![];
+    for ray in &rays {
+        draw_rays.push(ray.clone());
+    }
 
     // main event loop
     while let Some(e) = window.next() {
         // add code here to update mouse position
-        if reset {
+        if reset || reflection_count == 10 {
+            reflection_count = 0;
             rays = physics::generate_rays(physics::Vector2::new_from_array(mouse_pos), ray_count);
             big_ray_buffer.clear();
             big_ray_buffer = rays.iter().map(|ray| ray.clone()).collect();
+            reset = false;
+        }
+        // dirty implementation again
+        let mut _rays: Vec<Ray> = vec![];
+        for ray in &rays {
+            _rays.push(ray.clone());
+        }
+        let mut _mirrors: Vec<Mirror> = vec![];
+        for mirror in &mirrors {
+            _mirrors.push(mirror.clone());
         }
 
+        let handler: [Vec<Ray>; 2] =
+            physics::intersection_handler(_rays, _mirrors);
+        
+        reflection_count += 1;
+        rays = handler[0].clone();
+        draw_rays = handler[1].clone();
+        big_ray_buffer.append(&mut draw_rays);
+        
         if let Some(ref args) = e.press_args() {
             use piston_window::Button::Keyboard;
 
@@ -52,7 +79,6 @@ fn main() {
                 reset = true;
                 // do something here that reloads the keys
             }
-
         }
         if let Some(ref args) = e.mouse_cursor_args() {
             // update mouse pos
@@ -60,21 +86,37 @@ fn main() {
         }
         // draw stuff
         window.draw_2d(&e, |c: Context, g: &mut G2d, _| {
-            clear([1.0; 4], g);
             let black = [0.0, 0.0, 0.0, 1.0];
-
+            let blue = [0.0, 0.0, 1.0, 1.0];
+            let white = [1.0;4];
+            clear(black, g);
             // draw rays
-            for ray in &rays {
-                let line_coords = [ray.start_pos.x, ray.start_pos.y, ray.start_pos.x + ray.vector.x, ray.start_pos.y + ray.vector.y];
-                let color = black;
-                let thickness = 3.0;
-                line(black, thickness, line_coords, c.transform, g);
+            for ray in &big_ray_buffer {
+                // println!("{:?}", &ray.distance(ray.vector.clone()));
+                
+                let line_coords = [
+                    ray.start_pos.x,
+                    ray.start_pos.y,
+                    ray.vector.x,
+                    ray.vector.y,
+                ];
+                let thickness = 2.0;
+                line(blue, thickness, line_coords, c.transform, g);
+                rectangle([1.0, 1.0, 0.0, 1.0], [ray.vector.x, ray.vector.y, thickness, 0.0], c.transform, g);
             }
             // draw mirrors
-                
-            
-            
-            line(black, 2.0, [100.0, 200.0, 300.0, 400.0], c.transform, g);
+            for mirror in &mirrors {
+                let mirror_coords = [
+                    mirror.start_pos.x,
+                    mirror.start_pos.y,
+                    mirror.end_pos.x,
+                    mirror.end_pos.y,
+                ];
+                let thickness = 3.0;
+                line(white, thickness, mirror_coords, c.transform, g);
+            }
+
+            //line(black, 2.0, [100.0, 200.0, 300.0, 400.0], c.transform, g);
 
             /*
 
@@ -100,4 +142,42 @@ fn main() {
             }*/
         });
     }
+}
+
+
+fn generate_mirrors(path: &str, window_dimensions: [f64; 2]) -> Vec<Mirror> {
+    let mut mirrors: Vec<Mirror> = Vec::new();
+
+    let json_data = io::read_json(path);
+    let coord_format = &json_data.coord_format;
+    let json_mirrors = &json_data.mirrors;
+    if coord_format == "pixels" {
+        mirrors = json_mirrors
+            .iter()
+            .map(|mirror| Mirror {
+                start_pos: physics::Vector2::new(mirror.start_pos[0], mirror.start_pos[1]),
+                end_pos: physics::Vector2::new(mirror.end_pos[0], mirror.end_pos[1]),
+                absorption_factor: mirror.absorption_factor as f32,
+            })
+            .collect();
+    } else if coord_format == "fractions" {
+        mirrors = json_mirrors
+            .iter()
+            .map(|mirror| Mirror {
+                start_pos: physics::Vector2::new(
+                    mirror.start_pos[0] * window_dimensions[0],
+                    mirror.start_pos[1] * window_dimensions[1],
+                ),
+                end_pos: physics::Vector2::new(
+                    mirror.end_pos[0] * window_dimensions[0],
+                    mirror.end_pos[1] * window_dimensions[1],
+                ),
+                absorption_factor: mirror.absorption_factor as f32,
+            })
+            .collect();
+    } else {
+        panic!("wrong coord type in the file at: {:}\nexiting...", path)
+    }
+
+    mirrors
 }
