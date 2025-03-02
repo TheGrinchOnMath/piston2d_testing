@@ -1,6 +1,8 @@
 use piston_window::types::{Color, ColorComponent};
 use rand::prelude::*;
 use std::cell::Ref;
+use crate::io;
+use crate::io::JSON;
 
 // structures to wrap return statements that need a success and data iff success
 #[derive(Debug, Copy, Clone)]
@@ -150,10 +152,15 @@ impl Mirror {
     }
 
     fn normal(&self) -> [f64; 2] {
+        let mirror_vec =  [ 
+            self.end_pos[0] - self.start_pos[0],
+            self.end_pos[1] - self.start_pos[1]
+        ];
         [
-            self.end_pos[0] - self.end_pos[1],
-            self.start_pos[1] - self.start_pos[0],
+            mirror_vec[1],
+            -1f64 * mirror_vec[0],
         ]
+        
     }
 }
 
@@ -187,6 +194,64 @@ pub fn generate_mirrors(mirror_count: i32) -> Vec<Mirror> {
 
     mirrors
 }
+
+pub fn generate_mirrors_json(path: &str) -> Vec<Mirror> {
+    // for now this only accepts pixel dimensions
+    let mut mirrors:Vec<Mirror> = Vec::new();
+    
+    let json_data = io::read_json(path);
+    
+    let coord_format = "pixels";
+    
+    let mirrors_from_json = &json_data.mirrors;
+    
+    mirrors = mirrors_from_json.iter()
+        .map(|mirror| Mirror {
+            start_pos: [mirror.start_pos[0], mirror.start_pos[1]],
+            end_pos: [mirror.end_pos[0], mirror.end_pos[1]],
+            color: [1.0;4]
+        }).collect();
+        
+    
+    mirrors
+}
+/*
+
+fn generate_mirrors(path: &str, window_dimensions: [f64; 2]) -> Vec<Mirror> {
+    let mut mirrors: Vec<Mirror> = Vec::new();
+
+    let json_data = io::read_json(path);
+    let coord_format = &json_data.coord_format;
+    let json_mirrors = &json_data.mirrors;
+    if coord_format == "pixels" {
+        mirrors = json_mirrors
+            .iter()
+            .map(|mirror| Mirror {
+                start_pos: physics::Vector2::new(mirror.start_pos[0], mirror.start_pos[1]),
+                end_pos: physics::Vector2::new(mirror.end_pos[0], mirror.end_pos[1]),
+                absorption_factor: mirror.absorption_factor as f32,
+            })
+            .collect();
+    } else if coord_format == "fractions" {
+        mirrors = json_mirrors
+            .iter()
+            .map(|mirror| Mirror {
+                start_pos: physics::Vector2::new(
+                    mirror.start_pos[0] * window_dimensions[0],
+                    mirror.start_pos[1] * window_dimensions[1],
+                ),
+                end_pos: physics::Vector2::new(
+                    mirror.end_pos[0] * window_dimensions[0],
+                    mirror.end_pos[1] * window_dimensions[1],
+                ),
+                absorption_factor: mirror.absorption_factor as f32,
+            })
+            .collect();
+    } else {
+        panic!("wrong coord type in the file at: {:}\nexiting...", path)
+    }
+
+*/
 
 pub fn generate_rays(ray_count: f64, start: [f64; 2]) -> Vec<Ray> {
     // color of the ray. for now yellow
@@ -297,17 +362,17 @@ pub fn find_closest_mirror_reflections(
             // FIXME the normal vector is wrong for some reason
             let new_ray = ray.reflect(closest_position, _mirror.normal());
             result.reflected_rays.push(new_ray);
-            println!(
-                "closest_position: {:?} ray: {:?}, mirror : {:?}, normalVector: {:?} -> {:?} ", 
-                closest_position, 
-                ray, 
-                _mirror,
-                _mirror.normal(),
-                new_ray 
-            );
+            // println!(
+            //     "closest_position: {:?} ray: {:?}, mirror : {:?}, normalVector: {:?} -> {:?} ", 
+            //     closest_position, 
+            //     ray, 
+            //     _mirror,
+            //     _mirror.normal(),
+            //     new_ray 
+            // );
         
         }
     }
-    println!("\n\n\n");
+    //println!("\n\n\n");
     result
 }

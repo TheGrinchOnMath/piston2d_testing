@@ -1,9 +1,11 @@
+mod io;
 mod physics;
 
-use std::process::exit;
 use piston::EventLoop;
 use piston_window::*;
 use rand::prelude::*;
+use std::process::exit;
+use piston_window::types::ColorComponent;
 
 fn main() {
     // configure piston window
@@ -22,25 +24,24 @@ fn main() {
     let mut mouse_pos = [window.size().width as f64, window.size().height as f64];
 
     // generate mirrors. these only need to generate once, so are outside of the while loop
-    let mirrors = physics::generate_mirrors(10);
-
+    // let mirrors = physics::generate_mirrors(10);
+    let mirrors = physics::generate_mirrors_json("assets/mirrors.json");
     // this counts the computed reflections (to be able to fix limits)
     let mut reflection_counter = 0;
-    const MAX_REFLECTIONS: i32 = 3;
+    const MAX_REFLECTIONS: i32 = 50;
 
     // this lets us reset the sim
     let mut reset = true;
 
     // this lets us set the amount of rays
-    const RAY_COUNT:f64 = 5f64;
+    const RAY_COUNT: f64 = 5000f64;
 
     // keep track of all objects to draw
 
-    let mut rays:Vec<physics::Ray> = physics::generate_rays(RAY_COUNT, mouse_pos);
+    let mut rays: Vec<physics::Ray> = physics::generate_rays(RAY_COUNT, mouse_pos);
 
     let mut clear_once = true;
-    
-    
+
     // main draw loop, call draw() here
     while let Some(e) = window.next() {
         // process keyboard events
@@ -53,7 +54,6 @@ fn main() {
             if *args == Keyboard(Key::Space) {
                 reset = true;
             }
-
         }
 
         // process mouse events
@@ -63,95 +63,83 @@ fn main() {
         }
 
         // render
-         window.draw_2d(&e, |c:Context, g:&mut G2d, _| {
+        window.draw_2d(&e, |c: Context, g: &mut G2d, _| {
+            let white = [1.0; 4];
+            let black = [0.0, 0.0, 0.0, 1.0];
+            // check for reset, if so regen the rays
+            if clear_once {
+                clear(black, g);
+                clear_once = false;
+            }
 
-             let white = [1.0; 4];
-             let black = [0.0, 0.0, 0.0, 1.0];
-             // check for reset, if so regen the rays
-             if clear_once {
-             clear(black, g);
-                 clear_once = false;
-             }
-                 
-             let mut line_coords:Vec<[f64;4]> = Vec::new();
-             if !reset && reflection_counter <= MAX_REFLECTIONS {
-                 let result:physics::ReflectionHandlerResult = physics::find_closest_mirror_reflections(&rays, &mirrors);
-                 // extract new rays
-                 rays = result.reflected_rays;
+            let mut line_coords: Vec<[f64; 4]> = Vec::new();
+            if !reset && reflection_counter <= MAX_REFLECTIONS {
+                let result: physics::ReflectionHandlerResult =
+                    physics::find_closest_mirror_reflections(&rays, &mirrors);
+                // extract new rays
+                rays = result.reflected_rays;
 
-                 line_coords = result.draw_line;
+                line_coords = result.draw_line;
+                println!(
+                    "rendering set {}, {} rays & {} mirrors for {} intersection checks",
+                    reflection_counter,
+                    rays.len(),
+                    mirrors.len(),
+                    rays.len() * mirrors.len()
+                );
+            } else if reset {
+                rays = physics::generate_rays(RAY_COUNT, mouse_pos);
+                println!("resetting...\n\n");
+                //clear screen
+                clear(black, g);
+                reflection_counter = 0;
+                reset = false;
+            }
 
-             } else if reset {
-                 rays = physics::generate_rays(RAY_COUNT, mouse_pos);
-                 println!("resetting...\n\n");
-                 //clear screen
-                 clear(black, g);
-                 reflection_counter = 0;
-                 reset = false;
-             }
-             
+            reflection_counter += 1;
 
+            // line(black,2f64 ,[100f64, 100f64, 200f64, 200f64], c.transform, g);
 
+            // iterate over ray vec
+            /*for ray in rays {
+                // create array for draw
+                let draw_line = [
+                    ray.start_pos[0],
+                    ray.start_pos[1],
+                    ray.start_pos[0] + ray.vector[0] * 10_000f64,
+                    ray.start_pos[1] + ray.vector[1] * 10_000f64
+                ];
+                let color = ray.color;
+                // draw ray
+                line(color, 2.0, draw_line, c.transform, g);
+            }*/
 
-             reflection_counter += 1;
+            let color = [
+                rng.random_range(0f32..=1f32),
+                rng.random_range(0f32..=1f32),
+                rng.random_range(0f32..=1f32),
+                1.0,
+            ];
+            let dim_yellow:[ColorComponent;4] = [1.0, 1.0, 0.2, 0.02];
 
+            for coords in line_coords {
+                let line_info = [coords[0], coords[1], coords[2], coords[3]];
+                line(dim_yellow, 1.0, line_info, c.transform, g);
+            }
 
-             // line(black,2f64 ,[100f64, 100f64, 200f64, 200f64], c.transform, g);
-
-
-
-
-             // iterate over ray vec
-             /*for ray in rays {
-                 // create array for draw
-                 let draw_line = [
-                     ray.start_pos[0],
-                     ray.start_pos[1],
-                     ray.start_pos[0] + ray.vector[0] * 10_000f64,
-                     ray.start_pos[1] + ray.vector[1] * 10_000f64
-                 ];
-                 let color = ray.color;
-                 // draw ray
-                 line(color, 2.0, draw_line, c.transform, g);
-             }*/
-
-             let color = [
-                 rng.random_range(0f32..=1f32),
-                 rng.random_range(0f32..=1f32),
-                 rng.random_range(0f32..=1f32),
-                 1.0
-             ];
-
-             for coords in line_coords {
-                 let line_info = [
-                     coords[0],
-                     coords[1],
-                     coords[2],
-                     coords[3]
-                 ];
-                 line(
-                     color,
-                     1.0,
-                     line_info,
-                     c.transform,
-                     g
-                 );
-             }
-
-             // iterate over mirror vec
-             for mirror in mirrors.clone() {
-                 let draw_line = [
-                     mirror.start_pos[0],
-                     mirror.start_pos[1],
-                     mirror.end_pos[0],
-                     mirror.end_pos[1]
-                 ];
-                 let color = mirror.color;
-                 line(color, 3.0, draw_line, c.transform, g);
-             }
+            // iterate over mirror vec
+            for mirror in mirrors.clone() {
+                let draw_line = [
+                    mirror.start_pos[0],
+                    mirror.start_pos[1],
+                    mirror.end_pos[0],
+                    mirror.end_pos[1],
+                ];
+                let color = mirror.color;
+                line(color, 3.0, draw_line, c.transform, g);
+            }
         });
     }
-
 }
 
 // use this function to simplify draw calls. maybe pass the draw args in and get em out?

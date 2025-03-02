@@ -19,7 +19,7 @@
       ],
       "end_pos": [
         0.0,
-        1080.0
+        1200.0
       ],
       "absorption_factor": 1.0
     },
@@ -30,18 +30,18 @@
       ],
       "end_pos": [
         1920.0,
-        1080.0
+        1200.0
       ],
       "absorption_factor": 1.0
     },
     {
       "start_pos": [
         0.0,
-        1080.0
+        1200.0
       ],
       "end_pos": [
         1920.0,
-        1080.0
+        1200.0
       ],
       "absorption_factor": 1.0
     },
