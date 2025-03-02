@@ -3,6 +3,7 @@ mod physics;
 use std::process::exit;
 use piston::EventLoop;
 use piston_window::*;
+use rand::prelude::*;
 
 fn main() {
     // configure piston window
@@ -14,12 +15,32 @@ fn main() {
         .unwrap();
     window.set_lazy(true);
 
+    // setup random float provider
+    let mut rng = rand::rng();
+
     // configure "global" variables (cursor pos, etc)
     let mut mouse_pos = [window.size().width as f64, window.size().height as f64];
 
     // generate mirrors. these only need to generate once, so are outside of the while loop
-    let mirrors = physics::generate_mirrors(5);
+    let mirrors = physics::generate_mirrors(10);
 
+    // this counts the computed reflections (to be able to fix limits)
+    let mut reflection_counter = 0;
+    const MAX_REFLECTIONS: i32 = 3;
+
+    // this lets us reset the sim
+    let mut reset = true;
+
+    // this lets us set the amount of rays
+    const RAY_COUNT:f64 = 5f64;
+
+    // keep track of all objects to draw
+
+    let mut rays:Vec<physics::Ray> = physics::generate_rays(RAY_COUNT, mouse_pos);
+
+    let mut clear_once = true;
+    
+    
     // main draw loop, call draw() here
     while let Some(e) = window.next() {
         // process keyboard events
@@ -29,9 +50,9 @@ fn main() {
             if *args == Keyboard(Key::Escape) {
                 exit(0);
             }
-            // if *args == Keyboard(Key::Space) {
-            //
-            // }
+            if *args == Keyboard(Key::Space) {
+                reset = true;
+            }
 
         }
 
@@ -44,20 +65,41 @@ fn main() {
         // render
          window.draw_2d(&e, |c:Context, g:&mut G2d, _| {
 
-
-             //clear screen
-             let background_color = [1.0; 4];
+             let white = [1.0; 4];
              let black = [0.0, 0.0, 0.0, 1.0];
+             // check for reset, if so regen the rays
+             if clear_once {
+             clear(black, g);
+                 clear_once = false;
+             }
+                 
+             let mut line_coords:Vec<[f64;4]> = Vec::new();
+             if !reset && reflection_counter <= MAX_REFLECTIONS {
+                 let result:physics::ReflectionHandlerResult = physics::find_closest_mirror_reflections(&rays, &mirrors);
+                 // extract new rays
+                 rays = result.reflected_rays;
 
-             clear(background_color, g);
-             line(black,2f64 ,[100f64, 100f64, 200f64, 200f64], c.transform, g);
+                 line_coords = result.draw_line;
+
+             } else if reset {
+                 rays = physics::generate_rays(RAY_COUNT, mouse_pos);
+                 println!("resetting...\n\n");
+                 //clear screen
+                 clear(black, g);
+                 reflection_counter = 0;
+                 reset = false;
+             }
+             
 
 
-             // attempt drawing rays around the cursor?
-             let rays = physics::generate_rays(11.0, mouse_pos);
 
-             // process reflections:
-             let line_coords = handle_ray_stuff(&rays, &mirrors);
+             reflection_counter += 1;
+
+
+             // line(black,2f64 ,[100f64, 100f64, 200f64, 200f64], c.transform, g);
+
+
+
 
              // iterate over ray vec
              /*for ray in rays {
@@ -73,6 +115,13 @@ fn main() {
                  line(color, 2.0, draw_line, c.transform, g);
              }*/
 
+             let color = [
+                 rng.random_range(0f32..=1f32),
+                 rng.random_range(0f32..=1f32),
+                 rng.random_range(0f32..=1f32),
+                 1.0
+             ];
+
              for coords in line_coords {
                  let line_info = [
                      coords[0],
@@ -81,8 +130,8 @@ fn main() {
                      coords[3]
                  ];
                  line(
-                     [0.0, 1.0, 0.0, 1.0],
-                     2.0,
+                     color,
+                     1.0,
                      line_info,
                      c.transform,
                      g
@@ -106,24 +155,24 @@ fn main() {
 }
 
 // use this function to simplify draw calls. maybe pass the draw args in and get em out?
-fn render() {
+/*fn render() {
 
 }
 
 fn handle_inputs() {
 
-}
-
+}*/
+/*
 // FIXME remove this with something proper
 fn handle_ray_stuff(rays:&Vec<physics::Ray>, mirrors:&Vec<physics::Mirror>) -> Vec<[f64;4]>{
     let mut result = Vec::new();
     for ray in rays {
         let _ray = ray.clone();
-        let intersection = physics::find_closest_mirror(_ray, mirrors);
+        let intersection = physics::find_closest_mirror_no_reflections(_ray, mirrors);
         //println!("intersection: {:?}", intersection);
         // since f64:MAX means no position was found we can compare to that
         if (intersection[1][0] < f64::MAX) && (intersection[1][1] < f64::MAX) {
-            println!("intersection success");
+            //println!("intersection success");
             let line_coords = [intersection[0][0], intersection[0][1], intersection[1][0], intersection[1][1]];
             result.push(line_coords);
         } else {
@@ -133,4 +182,4 @@ fn handle_ray_stuff(rays:&Vec<physics::Ray>, mirrors:&Vec<physics::Mirror>) -> V
     }
     //println!("result: {:?}", result);
     result
-}
+}*/
