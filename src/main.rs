@@ -56,8 +56,11 @@ fn main() {
              // attempt drawing rays around the cursor?
              let rays = physics::generate_rays(11.0, mouse_pos);
 
+             // process reflections:
+             let line_coords = handle_ray_stuff(&rays, &mirrors);
+
              // iterate over ray vec
-             for ray in rays {
+             /*for ray in rays {
                  // create array for draw
                  let draw_line = [
                      ray.start_pos[0],
@@ -68,6 +71,22 @@ fn main() {
                  let color = ray.color;
                  // draw ray
                  line(color, 2.0, draw_line, c.transform, g);
+             }*/
+
+             for coords in line_coords {
+                 let line_info = [
+                     coords[0],
+                     coords[1],
+                     coords[2],
+                     coords[3]
+                 ];
+                 line(
+                     [0.0, 1.0, 0.0, 1.0],
+                     2.0,
+                     line_info,
+                     c.transform,
+                     g
+                 );
              }
 
              // iterate over mirror vec
@@ -93,4 +112,25 @@ fn render() {
 
 fn handle_inputs() {
 
+}
+
+// FIXME remove this with something proper
+fn handle_ray_stuff(rays:&Vec<physics::Ray>, mirrors:&Vec<physics::Mirror>) -> Vec<[f64;4]>{
+    let mut result = Vec::new();
+    for ray in rays {
+        let _ray = ray.clone();
+        let intersection = physics::find_closest_mirror(_ray, mirrors);
+        //println!("intersection: {:?}", intersection);
+        // since f64:MAX means no position was found we can compare to that
+        if (intersection[1][0] < f64::MAX) && (intersection[1][1] < f64::MAX) {
+            println!("intersection success");
+            let line_coords = [intersection[0][0], intersection[0][1], intersection[1][0], intersection[1][1]];
+            result.push(line_coords);
+        } else {
+            let line_coords = [_ray.start_pos[0], _ray.start_pos[1], _ray.start_pos[0] + 10_000f64*_ray.vector[0], _ray.start_pos[1] + 10_000f64 * ray.vector[1]];
+            result.push(line_coords);
+        }
+    }
+    //println!("result: {:?}", result);
+    result
 }
