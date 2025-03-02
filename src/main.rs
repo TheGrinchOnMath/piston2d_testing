@@ -3,7 +3,7 @@ mod physics;
 
 use piston::EventLoop;
 use piston_window::*;
-use rand::prelude::*;
+// use rand::prelude::*;
 use std::process::exit;
 use piston_window::types::ColorComponent;
 
@@ -18,12 +18,12 @@ fn main() {
     window.set_lazy(true);
 
     // setup random float provider
-    let mut rng = rand::rng();
+    // let mut rng = rand::rng();
 
     // configure "global" variables (cursor pos, etc)
-    let mut mouse_pos = [window.size().width as f64, window.size().height as f64];
+    let mut mouse_pos = [window.size().width, window.size().height];
 
-    // generate mirrors. these only need to generate once, so are outside of the while loop
+    // generate mirrors. these only need to generate once, so are outside the while loop
     // let mirrors = physics::generate_mirrors(10);
     let mirrors = physics::generate_mirrors_json("assets/mirrors.json");
     // this counts the computed reflections (to be able to fix limits)
@@ -64,7 +64,7 @@ fn main() {
 
         // render
         window.draw_2d(&e, |c: Context, g: &mut G2d, _| {
-            let white = [1.0; 4];
+            // let white = [1.0; 4];
             let black = [0.0, 0.0, 0.0, 1.0];
             // check for reset, if so regen the rays
             if clear_once {
@@ -114,12 +114,12 @@ fn main() {
                 line(color, 2.0, draw_line, c.transform, g);
             }*/
 
-            let color = [
-                rng.random_range(0f32..=1f32),
-                rng.random_range(0f32..=1f32),
-                rng.random_range(0f32..=1f32),
-                1.0,
-            ];
+            // let color = [
+            //     rng.random_range(0f32..=1f32),
+            //     rng.random_range(0f32..=1f32),
+            //     rng.random_range(0f32..=1f32),
+            //     1.0,
+            // ];
             let dim_yellow:[ColorComponent;4] = [1.0, 1.0, 0.2, 0.02];
 
             for coords in line_coords {
