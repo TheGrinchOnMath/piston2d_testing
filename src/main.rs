@@ -1,183 +1,173 @@
 mod io;
 mod physics;
-//mod render;
 
-extern crate piston_window;
-
-use crate::physics::{Mirror, Ray};
+use piston::EventLoop;
 use piston_window::*;
+// use rand::prelude::*;
 use std::process::exit;
+use piston_window::types::ColorComponent;
 
 fn main() {
+    // configure piston window
     let opengl = OpenGL::V3_2;
-    let mut window: PistonWindow = WindowSettings::new("piston2d", [800;2])
+    let mut window: PistonWindow = WindowSettings::new("piston2d", [800; 2])
         .exit_on_esc(true)
         .graphics_api(opengl)
         .build()
         .unwrap();
     window.set_lazy(true);
-    
-    let mut reflection_count = 0;
-    // init mouse pos by setting it to the middle of the window
-    let mut mouse_pos: [f64; 2] = [window.size().width, window.size().height];
-    // init reset variable. this will be used to trigger the rays be deleted
+
+    // setup random float provider
+    // let mut rng = rand::rng();
+
+    // configure "global" variables (cursor pos, etc)
+    let mut mouse_pos = [window.size().width, window.size().height];
+
+    // generate mirrors. these only need to generate once, so are outside the while loop
+    // let mirrors = physics::generate_mirrors(10);
+    let mirrors = physics::generate_mirrors_json("assets/mirrors.json");
+    // this counts the computed reflections (to be able to fix limits)
+    let mut reflection_counter = 0;
+    const MAX_REFLECTIONS: i32 = 50;
+
+    // this lets us reset the sim
     let mut reset = true;
-    // init rays, mirrors vectors. they contain the rays and mirrors.
-    // mirrors are loaded from a json file, rays are generated from cursor position
-    let mut rays: Vec<Ray>;
-    let mirrors: Vec<Mirror> = generate_mirrors(
-        "assets/mirrors.json",
-        [window.size().width, window.size().height],
-    );
-    let ray_count = 11;
-    // this might be stupid, and it probably is, but hey!
-    // big vec of all the generated rays after each reset. might make a lot of memory be used.
-    let mut big_ray_buffer: Vec<Ray> = vec![];
-    // generate very first set of rays
-    rays = physics::generate_rays(physics::Vector2::new_from_array(mouse_pos), ray_count);
-    let mut draw_rays: Vec<Ray> = vec![];
-    for ray in &rays {
-        draw_rays.push(ray.clone());
-    }
 
-    // main event loop
+    // this lets us set the amount of rays
+    const RAY_COUNT: f64 = 5000f64;
+
+    // keep track of all objects to draw
+
+    let mut rays: Vec<physics::Ray> = physics::generate_rays(RAY_COUNT, mouse_pos);
+
+    let mut clear_once = true;
+
+    // main draw loop, call draw() here
     while let Some(e) = window.next() {
-        // add code here to update mouse position
-        if reset || reflection_count == 10 {
-            reflection_count = 0;
-            rays = physics::generate_rays(physics::Vector2::new_from_array(mouse_pos), ray_count);
-            big_ray_buffer.clear();
-            big_ray_buffer = rays.iter().map(|ray| ray.clone()).collect();
-            reset = false;
-        }
-        // dirty implementation again
-        let mut _rays: Vec<Ray> = vec![];
-        for ray in &rays {
-            _rays.push(ray.clone());
-        }
-        let mut _mirrors: Vec<Mirror> = vec![];
-        for mirror in &mirrors {
-            _mirrors.push(mirror.clone());
-        }
-
-        let handler: [Vec<Ray>; 2] =
-            physics::intersection_handler(_rays, _mirrors);
-        
-        reflection_count += 1;
-        rays = handler[0].clone();
-        draw_rays = handler[1].clone();
-        big_ray_buffer.append(&mut draw_rays);
-        
+        // process keyboard events
         if let Some(ref args) = e.press_args() {
             use piston_window::Button::Keyboard;
 
             if *args == Keyboard(Key::Escape) {
-                // kill the process
-                exit(0)
+                exit(0);
             }
             if *args == Keyboard(Key::Space) {
                 reset = true;
-                // do something here that reloads the keys
             }
         }
+
+        // process mouse events
         if let Some(ref args) = e.mouse_cursor_args() {
-            // update mouse pos
+            // update mouse pos every frame
             mouse_pos = *args;
         }
-        // draw stuff
+
+        // render
         window.draw_2d(&e, |c: Context, g: &mut G2d, _| {
+            // let white = [1.0; 4];
             let black = [0.0, 0.0, 0.0, 1.0];
-            let blue = [0.0, 0.0, 1.0, 1.0];
-            let white = [1.0;4];
-            clear(black, g);
-            // draw rays
-            for ray in &big_ray_buffer {
-                // println!("{:?}", &ray.distance(ray.vector.clone()));
-                
-                let line_coords = [
-                    ray.start_pos.x,
-                    ray.start_pos.y,
-                    ray.vector.x,
-                    ray.vector.y,
-                ];
-                let thickness = 2.0;
-                line(blue, thickness, line_coords, c.transform, g);
-                rectangle([1.0, 1.0, 0.0, 1.0], [ray.vector.x, ray.vector.y, thickness, 0.0], c.transform, g);
-            }
-            // draw mirrors
-            for mirror in &mirrors {
-                let mirror_coords = [
-                    mirror.start_pos.x,
-                    mirror.start_pos.y,
-                    mirror.end_pos.x,
-                    mirror.end_pos.y,
-                ];
-                let thickness = 3.0;
-                line(white, thickness, mirror_coords, c.transform, g);
+            // check for reset, if so regen the rays
+            if clear_once {
+                clear(black, g);
+                clear_once = false;
             }
 
-            //line(black, 2.0, [100.0, 200.0, 300.0, 400.0], c.transform, g);
+            let mut line_coords: Vec<[f64; 4]> = Vec::new();
+            if !reset && reflection_counter <= MAX_REFLECTIONS {
+                let result: physics::ReflectionHandlerResult =
+                    physics::find_closest_mirror_reflections(&rays, &mirrors);
+                // extract new rays
+                rays = result.reflected_rays;
 
-            /*
+                line_coords = result.draw_line;
+                println!(
+                    "rendering set {}, {} rays & {} mirrors for {} intersection checks",
+                    reflection_counter,
+                    rays.len(),
+                    mirrors.len(),
+                    rays.len() * mirrors.len()
+                );
+            } else if reset {
+                rays = physics::generate_rays(RAY_COUNT, mouse_pos);
+                println!("resetting...\n\n");
+                //clear screen
+                clear(black, g);
+                reflection_counter = 0;
+                reset = false;
+            }
 
-            for i in 0..5 {
+            reflection_counter += 1;
 
-                let c = c.trans(0.0, i as f64 * 100.0);
-                let red = [1.0, 0.0, 0.0, 1.0];
-                let rect = math::margin_rectangle([20.0, 20.0, 60.0, 60.0], i as f64 * 5.0);
-                //rectangle(red, rect, c.transform, g);
-                //Rectangle::new_border(black, 2.0).draw(rect, &c.draw_state, c.transform, g);
-                let green = [0.0, 1.0, 0.0, 1.0];
-                let h = 60.0 * (1.0 - i as f64 / 5.0);
-                let rect = [120.0, 50.0 - h / 2.0, 60.0, h];
-                //ellipse(green, rect, c.transform, g);
-                //Ellipse::new_border(black, 2.0).draw(rect, &c.draw_state, c.transform, g);
-                let blue = [0.0, 0.0, 1.0, 1.0];
-                // circle_arc(blue, 10.0, 0.0, f64::_360() - i as f64 * 1.2, [230.0, 30.0, 40.0, 40.0], c.transform, g);
-                let orange = [1.0, 0.5, 0.0, 1.0];
-                line(orange, 5.0, [320.0 + i as f64 * 15.0, 20.0, 380.0 - i as f64 * 15.0, 80.0],
-                     c.transform, g);
-                let magenta = [1.0, 0.0, 0.5, 1.0];
-                // polygon(magenta, &[[420.0, 20.0], [480.0, 20.0], [480.0 - i as f64 * 15.0, 80.0] ], c.transform, g);
+            // line(black,2f64 ,[100f64, 100f64, 200f64, 200f64], c.transform, g);
+
+            // iterate over ray vec
+            /*for ray in rays {
+                // create array for draw
+                let draw_line = [
+                    ray.start_pos[0],
+                    ray.start_pos[1],
+                    ray.start_pos[0] + ray.vector[0] * 10_000f64,
+                    ray.start_pos[1] + ray.vector[1] * 10_000f64
+                ];
+                let color = ray.color;
+                // draw ray
+                line(color, 2.0, draw_line, c.transform, g);
             }*/
+
+            // let color = [
+            //     rng.random_range(0f32..=1f32),
+            //     rng.random_range(0f32..=1f32),
+            //     rng.random_range(0f32..=1f32),
+            //     1.0,
+            // ];
+            let dim_yellow:[ColorComponent;4] = [1.0, 1.0, 0.2, 0.02];
+
+            for coords in line_coords {
+                let line_info = [coords[0], coords[1], coords[2], coords[3]];
+                line(dim_yellow, 1.0, line_info, c.transform, g);
+            }
+
+            // iterate over mirror vec
+            for mirror in mirrors.clone() {
+                let draw_line = [
+                    mirror.start_pos[0],
+                    mirror.start_pos[1],
+                    mirror.end_pos[0],
+                    mirror.end_pos[1],
+                ];
+                let color = mirror.color;
+                line(color, 3.0, draw_line, c.transform, g);
+            }
         });
     }
 }
 
+// use this function to simplify draw calls. maybe pass the draw args in and get em out?
+/*fn render() {
 
-fn generate_mirrors(path: &str, window_dimensions: [f64; 2]) -> Vec<Mirror> {
-    let mut mirrors: Vec<Mirror> = Vec::new();
-
-    let json_data = io::read_json(path);
-    let coord_format = &json_data.coord_format;
-    let json_mirrors = &json_data.mirrors;
-    if coord_format == "pixels" {
-        mirrors = json_mirrors
-            .iter()
-            .map(|mirror| Mirror {
-                start_pos: physics::Vector2::new(mirror.start_pos[0], mirror.start_pos[1]),
-                end_pos: physics::Vector2::new(mirror.end_pos[0], mirror.end_pos[1]),
-                absorption_factor: mirror.absorption_factor as f32,
-            })
-            .collect();
-    } else if coord_format == "fractions" {
-        mirrors = json_mirrors
-            .iter()
-            .map(|mirror| Mirror {
-                start_pos: physics::Vector2::new(
-                    mirror.start_pos[0] * window_dimensions[0],
-                    mirror.start_pos[1] * window_dimensions[1],
-                ),
-                end_pos: physics::Vector2::new(
-                    mirror.end_pos[0] * window_dimensions[0],
-                    mirror.end_pos[1] * window_dimensions[1],
-                ),
-                absorption_factor: mirror.absorption_factor as f32,
-            })
-            .collect();
-    } else {
-        panic!("wrong coord type in the file at: {:}\nexiting...", path)
-    }
-
-    mirrors
 }
+
+fn handle_inputs() {
+
+}*/
+/*
+// FIXME remove this with something proper
+fn handle_ray_stuff(rays:&Vec<physics::Ray>, mirrors:&Vec<physics::Mirror>) -> Vec<[f64;4]>{
+    let mut result = Vec::new();
+    for ray in rays {
+        let _ray = ray.clone();
+        let intersection = physics::find_closest_mirror_no_reflections(_ray, mirrors);
+        //println!("intersection: {:?}", intersection);
+        // since f64:MAX means no position was found we can compare to that
+        if (intersection[1][0] < f64::MAX) && (intersection[1][1] < f64::MAX) {
+            //println!("intersection success");
+            let line_coords = [intersection[0][0], intersection[0][1], intersection[1][0], intersection[1][1]];
+            result.push(line_coords);
+        } else {
+            let line_coords = [_ray.start_pos[0], _ray.start_pos[1], _ray.start_pos[0] + 10_000f64*_ray.vector[0], _ray.start_pos[1] + 10_000f64 * ray.vector[1]];
+            result.push(line_coords);
+        }
+    }
+    //println!("result: {:?}", result);
+    result
+}*/
