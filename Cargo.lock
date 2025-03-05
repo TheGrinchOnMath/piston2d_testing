@@ -515,6 +515,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "gl"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a94edab108827d67608095e269cf862e60d920f144a5026d3dbcfd8b877fb404"
+dependencies = [
+ "gl_generator 0.14.0",
+]
+
+[[package]]
 name = "gl_generator"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1193,7 +1202,7 @@ dependencies = [
  "gfx",
  "piston-gfx_texture",
  "piston-shaders_graphics2d",
- "piston2d-graphics",
+ "piston2d-graphics 0.44.0",
  "shader_version",
 ]
 
@@ -1213,14 +1222,50 @@ dependencies = [
 ]
 
 [[package]]
+name = "piston2d-graphics"
+version = "0.45.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efa81d40c7b656d270fdbfeef8c531cc04493a001937f5a7d0c5cdb3db2b1469"
+dependencies = [
+ "fnv",
+ "interpolation",
+ "piston-texture",
+ "piston-viewport",
+ "read_color",
+ "rusttype",
+ "vecmath",
+]
+
+[[package]]
+name = "piston2d-opengl_graphics"
+version = "0.88.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "599663af69253eb039c71bb4e26eea2842185f1c2cf9caf5d87913e5810571a9"
+dependencies = [
+ "fnv",
+ "gl 0.14.0",
+ "image",
+ "khronos_api",
+ "piston-shaders_graphics2d",
+ "piston-texture",
+ "piston-viewport",
+ "piston2d-graphics 0.45.0",
+ "shader_version",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "piston2d_testing"
 version = "0.1.0"
 dependencies = [
  "piston",
+ "piston2d-opengl_graphics",
  "piston_window",
  "rand 0.9.0",
  "serde",
  "serde_json",
+ "vector2d",
 ]
 
 [[package]]
@@ -1234,7 +1279,7 @@ dependencies = [
  "piston",
  "piston-texture",
  "piston2d-gfx_graphics",
- "piston2d-graphics",
+ "piston2d-graphics 0.44.0",
  "pistoncore-glutin_window",
  "shader_version",
 ]
@@ -1256,7 +1301,7 @@ version = "0.72.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "006f26dfaef3db5d3f29927a5aeedc62680e947707cd1d33015a7dba32234bdb"
 dependencies = [
- "gl",
+ "gl 0.13.0",
  "glutin",
  "glutin-winit",
  "pistoncore-input",
@@ -1890,6 +1935,12 @@ checksum = "956ae1e0d85bca567dee1dcf87fb1ca2e792792f66f87dced8381f99cd91156a"
 dependencies = [
  "piston-float",
 ]
+
+[[package]]
+name = "vector2d"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "567b2fa9c7ae37b0c180cdda3aebed26cbbd81344bcfeedd7650eeb8088b5a7b"
 
 [[package]]
 name = "version-compare"
