@@ -1,173 +1,44 @@
-mod io;
-mod physics;
+use std::thread;
 
-use piston::EventLoop;
-use piston_window::*;
-// use rand::prelude::*;
-use std::process::exit;
-use piston_window::types::ColorComponent;
+use ggez::{winit::event_loop, *};
+
 
 fn main() {
-    // configure piston window
-    let opengl = OpenGL::V3_2;
-    let mut window: PistonWindow = WindowSettings::new("piston2d", [800; 2])
-        .exit_on_esc(true)
-        .graphics_api(opengl)
-        .build()
-        .unwrap();
-    window.set_lazy(true);
+    println!("hello world!");
 
-    // setup random float provider
-    // let mut rng = rand::rng();
+    let state = State {dt: std::time::Duration::new(0, 0)};
 
-    // configure "global" variables (cursor pos, etc)
-    let mut mouse_pos = [window.size().width, window.size().height];
+    let c = conf::Conf::new();
+    let (ctx, event_loop) = ContextBuilder::new("hello ggez!", "Gronk")
+    .default_conf(c)
+    .build()
+    .unwrap();
 
-    // generate mirrors. these only need to generate once, so are outside the while loop
-    // let mirrors = physics::generate_mirrors(10);
-    let mirrors = physics::generate_mirrors_json("assets/mirrors.json");
-    // this counts the computed reflections (to be able to fix limits)
-    let mut reflection_counter = 0;
-    const MAX_REFLECTIONS: i32 = 50;
-
-    // this lets us reset the sim
-    let mut reset = true;
-
-    // this lets us set the amount of rays
-    const RAY_COUNT: f64 = 5000f64;
-
-    // keep track of all objects to draw
-
-    let mut rays: Vec<physics::Ray> = physics::generate_rays(RAY_COUNT, mouse_pos);
-
-    let mut clear_once = true;
-
-    // main draw loop, call draw() here
-    while let Some(e) = window.next() {
-        // process keyboard events
-        if let Some(ref args) = e.press_args() {
-            use piston_window::Button::Keyboard;
-
-            if *args == Keyboard(Key::Escape) {
-                exit(0);
-            }
-            if *args == Keyboard(Key::Space) {
-                reset = true;
-            }
-        }
-
-        // process mouse events
-        if let Some(ref args) = e.mouse_cursor_args() {
-            // update mouse pos every frame
-            mouse_pos = *args;
-        }
-
-        // render
-        window.draw_2d(&e, |c: Context, g: &mut G2d, _| {
-            // let white = [1.0; 4];
-            let black = [0.0, 0.0, 0.0, 1.0];
-            // check for reset, if so regen the rays
-            if clear_once {
-                clear(black, g);
-                clear_once = false;
-            }
-
-            let mut line_coords: Vec<[f64; 4]> = Vec::new();
-            if !reset && reflection_counter <= MAX_REFLECTIONS {
-                let result: physics::ReflectionHandlerResult =
-                    physics::find_closest_mirror_reflections(&rays, &mirrors);
-                // extract new rays
-                rays = result.reflected_rays;
-
-                line_coords = result.draw_line;
-                println!(
-                    "rendering set {}, {} rays & {} mirrors for {} intersection checks",
-                    reflection_counter,
-                    rays.len(),
-                    mirrors.len(),
-                    rays.len() * mirrors.len()
-                );
-            } else if reset {
-                rays = physics::generate_rays(RAY_COUNT, mouse_pos);
-                println!("resetting...\n\n");
-                //clear screen
-                clear(black, g);
-                reflection_counter = 0;
-                reset = false;
-            }
-
-            reflection_counter += 1;
-
-            // line(black,2f64 ,[100f64, 100f64, 200f64, 200f64], c.transform, g);
-
-            // iterate over ray vec
-            /*for ray in rays {
-                // create array for draw
-                let draw_line = [
-                    ray.start_pos[0],
-                    ray.start_pos[1],
-                    ray.start_pos[0] + ray.vector[0] * 10_000f64,
-                    ray.start_pos[1] + ray.vector[1] * 10_000f64
-                ];
-                let color = ray.color;
-                // draw ray
-                line(color, 2.0, draw_line, c.transform, g);
-            }*/
-
-            // let color = [
-            //     rng.random_range(0f32..=1f32),
-            //     rng.random_range(0f32..=1f32),
-            //     rng.random_range(0f32..=1f32),
-            //     1.0,
-            // ];
-            let dim_yellow:[ColorComponent;4] = [1.0, 1.0, 0.2, 0.02];
-
-            for coords in line_coords {
-                let line_info = [coords[0], coords[1], coords[2], coords[3]];
-                line(dim_yellow, 1.0, line_info, c.transform, g);
-            }
-
-            // iterate over mirror vec
-            for mirror in mirrors.clone() {
-                let draw_line = [
-                    mirror.start_pos[0],
-                    mirror.start_pos[1],
-                    mirror.end_pos[0],
-                    mirror.end_pos[1],
-                ];
-                let color = mirror.color;
-                line(color, 3.0, draw_line, c.transform, g);
-            }
-        });
-    }
+    event::run(ctx, event_loop, state);
 }
 
-// use this function to simplify draw calls. maybe pass the draw args in and get em out?
-/*fn render() {
-
+struct State{
+    dt: std::time::Duration,
 }
 
-fn handle_inputs() {
-
-}*/
-/*
-// FIXME remove this with something proper
-fn handle_ray_stuff(rays:&Vec<physics::Ray>, mirrors:&Vec<physics::Mirror>) -> Vec<[f64;4]>{
-    let mut result = Vec::new();
-    for ray in rays {
-        let _ray = ray.clone();
-        let intersection = physics::find_closest_mirror_no_reflections(_ray, mirrors);
-        //println!("intersection: {:?}", intersection);
-        // since f64:MAX means no position was found we can compare to that
-        if (intersection[1][0] < f64::MAX) && (intersection[1][1] < f64::MAX) {
-            //println!("intersection success");
-            let line_coords = [intersection[0][0], intersection[0][1], intersection[1][0], intersection[1][1]];
-            result.push(line_coords);
-        } else {
-            let line_coords = [_ray.start_pos[0], _ray.start_pos[1], _ray.start_pos[0] + 10_000f64*_ray.vector[0], _ray.start_pos[1] + 10_000f64 * ray.vector[1]];
-            result.push(line_coords);
-        }
+impl ggez::event::EventHandler<GameError> for State {
+    fn update(&mut self, ctx: &mut Context) -> GameResult {
+        self.dt = ctx.time.delta();
+        Ok(())
     }
-    //println!("result: {:?}", result);
-    result
-}*/
+    fn draw(&mut self, ctx: &mut Context) -> GameResult {
+        
+        let dt = self.dt.as_secs_f64();
+
+        let wait_time = 1./30. - dt;
+
+        if wait_time > 0. {
+            thread::sleep(std::time::Duration::from_secs_f64(wait_time));
+        }
+
+        let fps = 1. / dt;
+        
+        println!("hello ggez!\tfps = {}",fps);
+        Ok(())
+    }
+  }
