@@ -1,24 +1,30 @@
 use std::thread;
+use std::time::Duration;
 
 use ggez::{winit::event_loop, *};
-
 
 fn main() {
     println!("hello world!");
 
-    let state = State {dt: std::time::Duration::new(0, 0)};
-
-    let c = conf::Conf::new();
+    let fps_cap: f64 = 30.;
+    let state: State = State {
+        dt: Duration::new(0, 0),
+        avg_fps: vec![fps_cap],
+        fps_cap,
+    };
+    let c: conf::Conf = conf::Conf::new();
     let (ctx, event_loop) = ContextBuilder::new("hello ggez!", "Gronk")
-    .default_conf(c)
-    .build()
-    .unwrap();
+        .default_conf(c)
+        .build()
+        .unwrap();
 
     event::run(ctx, event_loop, state);
 }
 
-struct State{
-    dt: std::time::Duration,
+struct State {
+    dt: Duration,
+    avg_fps: Vec<f64>,
+    fps_cap: f64,
 }
 
 impl ggez::event::EventHandler<GameError> for State {
@@ -27,18 +33,22 @@ impl ggez::event::EventHandler<GameError> for State {
         Ok(())
     }
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        
         let dt = self.dt.as_secs_f64();
 
-        let wait_time = 1./30. - dt;
+        
+        let fps = 1. / dt;
 
-        if wait_time > 0. {
-            thread::sleep(std::time::Duration::from_secs_f64(wait_time));
+        self.avg_fps.push(fps);
+
+        let avg_fps_notvec:f64 = self.avg_fps.iter().sum::<f64>() / self.avg_fps.len() as f64;
+
+        if fps > self.fps_cap {
+            let time = Duration::from_secs_f64(-1. /fps + 1./self.fps_cap);
+            ggez::timer::sleep(time);
         }
 
-        let fps = 1. / dt;
-        
-        println!("hello ggez!\tfps = {}",fps);
+
+        println!("hello ggez!\tfps = {} \t\t avg fps: {}", fps, avg_fps_notvec);
         Ok(())
     }
-  }
+}
