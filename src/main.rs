@@ -34,7 +34,7 @@ fn main() {
     let mut reset = true;
 
     // this lets us set the amount of rays
-    const RAY_COUNT: f64 = 5000f64;
+    const RAY_COUNT: f64 = 50_000f64;
 
     // keep track of all objects to draw
 
