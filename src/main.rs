@@ -1,173 +1,87 @@
-mod io;
-mod physics;
+mod mirror;
 
-use piston::EventLoop;
-use piston_window::*;
-// use rand::prelude::*;
-use std::process::exit;
-use piston_window::types::ColorComponent;
+extern crate glutin_window;
+extern crate graphics;
+extern crate opengl_graphics;
+extern crate piston;
+extern crate vector2d;
+
+use glutin_window::GlutinWindow as Window;
+use graphics::math::Matrix2d;
+use opengl_graphics::{GlGraphics, OpenGL};
+use piston::event_loop::{EventSettings, Events};
+use piston::input::{RenderArgs, RenderEvent, UpdateArgs, UpdateEvent};
+use piston::window::WindowSettings;
+use vector2d::Vector2D;
+
+pub struct App {
+    gl: GlGraphics,
+    reflection_counter: i32,
+    mirrors: Vec<mirror::Mirror>,
+    mouse_pos: Vector2D<f64>,
+    rays: Vec<mirror::Ray>,
+    clear_window: bool,
+}
+
+impl App {
+    // main render function
+    fn render(&mut self, args: &RenderArgs) {
+        use graphics::*;
+
+        // get window dimensions
+        let window_size: Vector2D<f64> = Vector2D {
+            x: args.window_size[0],
+            y: args.window_size[1],
+        };
+
+        // draw call
+        self.gl
+            .draw(args.viewport(), |c: Context, gl: &mut GlGraphics| {
+                let transform = c.transform;
+
+                // clear screen?
+                if self.clear_window {
+                    clear(color::BLACK, gl);
+
+                    line_from_to(color::WHITE, 3.0, [1.0, 1.0], [100.0, 100.0], transform, gl);
+                }
+            })
+    }
+
+    // main update function.
+    fn update(&mut self, args: &UpdateArgs) {}
+}
 
 fn main() {
-    // configure piston window
-    let opengl = OpenGL::V3_2;
-    let mut window: PistonWindow = WindowSettings::new("piston2d", [800; 2])
+    // change to OpenGL::V2_1 if no workey
+    let gl = OpenGL::V3_2;
+
+    // create Glutin Window
+    let mut window: Window = WindowSettings::new("test123", [200; 2])
+        .graphics_api(gl)
         .exit_on_esc(true)
-        .graphics_api(opengl)
         .build()
         .unwrap();
-    window.set_lazy(true);
 
-    // setup random float provider
-    // let mut rng = rand::rng();
+    // create a new App instance.
+    let mut app = App {
+        gl: GlGraphics::new(gl),
+        reflection_counter: 0,
+        mirrors: vec![mirror::Mirror {}],
+        mouse_pos: vector2d::Vector2D::<f64> { x: 0f64, y: 0f64 },
+        rays: vec![mirror::Ray {}],
+        clear_window: true,
+    };
 
-    // configure "global" variables (cursor pos, etc)
-    let mut mouse_pos = [window.size().width, window.size().height];
-
-    // generate mirrors. these only need to generate once, so are outside the while loop
-    // let mirrors = physics::generate_mirrors(10);
-    let mirrors = physics::generate_mirrors_json("assets/mirrors.json");
-    // this counts the computed reflections (to be able to fix limits)
-    let mut reflection_counter = 0;
-    const MAX_REFLECTIONS: i32 = 50;
-
-    // this lets us reset the sim
-    let mut reset = true;
-
-    // this lets us set the amount of rays
-    const RAY_COUNT: f64 = 5000f64;
-
-    // keep track of all objects to draw
-
-    let mut rays: Vec<physics::Ray> = physics::generate_rays(RAY_COUNT, mouse_pos);
-
-    let mut clear_once = true;
-
-    // main draw loop, call draw() here
-    while let Some(e) = window.next() {
-        // process keyboard events
-        if let Some(ref args) = e.press_args() {
-            use piston_window::Button::Keyboard;
-
-            if *args == Keyboard(Key::Escape) {
-                exit(0);
-            }
-            if *args == Keyboard(Key::Space) {
-                reset = true;
-            }
+    let mut events = Events::new(EventSettings::new());
+    // main event loop
+    while let Some(e) = events.next(&mut window) {
+        if let Some(args) = e.render_args() {
+            app.render(&args);
         }
 
-        // process mouse events
-        if let Some(ref args) = e.mouse_cursor_args() {
-            // update mouse pos every frame
-            mouse_pos = *args;
-        }
-
-        // render
-        window.draw_2d(&e, |c: Context, g: &mut G2d, _| {
-            // let white = [1.0; 4];
-            let black = [0.0, 0.0, 0.0, 1.0];
-            // check for reset, if so regen the rays
-            if clear_once {
-                clear(black, g);
-                clear_once = false;
-            }
-
-            let mut line_coords: Vec<[f64; 4]> = Vec::new();
-            if !reset && reflection_counter <= MAX_REFLECTIONS {
-                let result: physics::ReflectionHandlerResult =
-                    physics::find_closest_mirror_reflections(&rays, &mirrors);
-                // extract new rays
-                rays = result.reflected_rays;
-
-                line_coords = result.draw_line;
-                println!(
-                    "rendering set {}, {} rays & {} mirrors for {} intersection checks",
-                    reflection_counter,
-                    rays.len(),
-                    mirrors.len(),
-                    rays.len() * mirrors.len()
-                );
-            } else if reset {
-                rays = physics::generate_rays(RAY_COUNT, mouse_pos);
-                println!("resetting...\n\n");
-                //clear screen
-                clear(black, g);
-                reflection_counter = 0;
-                reset = false;
-            }
-
-            reflection_counter += 1;
-
-            // line(black,2f64 ,[100f64, 100f64, 200f64, 200f64], c.transform, g);
-
-            // iterate over ray vec
-            /*for ray in rays {
-                // create array for draw
-                let draw_line = [
-                    ray.start_pos[0],
-                    ray.start_pos[1],
-                    ray.start_pos[0] + ray.vector[0] * 10_000f64,
-                    ray.start_pos[1] + ray.vector[1] * 10_000f64
-                ];
-                let color = ray.color;
-                // draw ray
-                line(color, 2.0, draw_line, c.transform, g);
-            }*/
-
-            // let color = [
-            //     rng.random_range(0f32..=1f32),
-            //     rng.random_range(0f32..=1f32),
-            //     rng.random_range(0f32..=1f32),
-            //     1.0,
-            // ];
-            let dim_yellow:[ColorComponent;4] = [1.0, 1.0, 0.2, 0.02];
-
-            for coords in line_coords {
-                let line_info = [coords[0], coords[1], coords[2], coords[3]];
-                line(dim_yellow, 1.0, line_info, c.transform, g);
-            }
-
-            // iterate over mirror vec
-            for mirror in mirrors.clone() {
-                let draw_line = [
-                    mirror.start_pos[0],
-                    mirror.start_pos[1],
-                    mirror.end_pos[0],
-                    mirror.end_pos[1],
-                ];
-                let color = mirror.color;
-                line(color, 3.0, draw_line, c.transform, g);
-            }
-        });
-    }
-}
-
-// use this function to simplify draw calls. maybe pass the draw args in and get em out?
-/*fn render() {
-
-}
-
-fn handle_inputs() {
-
-}*/
-/*
-// FIXME remove this with something proper
-fn handle_ray_stuff(rays:&Vec<physics::Ray>, mirrors:&Vec<physics::Mirror>) -> Vec<[f64;4]>{
-    let mut result = Vec::new();
-    for ray in rays {
-        let _ray = ray.clone();
-        let intersection = physics::find_closest_mirror_no_reflections(_ray, mirrors);
-        //println!("intersection: {:?}", intersection);
-        // since f64:MAX means no position was found we can compare to that
-        if (intersection[1][0] < f64::MAX) && (intersection[1][1] < f64::MAX) {
-            //println!("intersection success");
-            let line_coords = [intersection[0][0], intersection[0][1], intersection[1][0], intersection[1][1]];
-            result.push(line_coords);
-        } else {
-            let line_coords = [_ray.start_pos[0], _ray.start_pos[1], _ray.start_pos[0] + 10_000f64*_ray.vector[0], _ray.start_pos[1] + 10_000f64 * ray.vector[1]];
-            result.push(line_coords);
+        if let Some(args) = e.update_args() {
+            app.update(&args);
         }
     }
-    //println!("result: {:?}", result);
-    result
-}*/
+}
