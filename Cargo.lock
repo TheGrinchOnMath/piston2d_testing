@@ -3,6 +3,22 @@
 version = 4
 
 [[package]]
+name = "Rust-2D-Ray-Tracing"
+version = "0.1.0"
+dependencies = [
+ "pathlib",
+ "piston",
+ "piston2d-graphics 0.45.0",
+ "piston2d-opengl_graphics",
+ "piston_window",
+ "pistoncore-glutin_window 0.73.2",
+ "rand",
+ "serde",
+ "serde_json",
+ "vector2d",
+]
+
+[[package]]
 name = "ab_glyph"
 version = "0.2.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1847,6 +1863,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35fb2e5f958ec131621fdd531e9fc186ed768cbe395337403ae56c17a74c68ec"
 
 [[package]]
+name = "pathlib"
+version = "0.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "913951ece1c220c5dcea7d87795821c17b32bfc013dd18ba1769a86e3e806919"
+
+[[package]]
 name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1995,21 +2017,6 @@ dependencies = [
  "shader_version",
  "wasm-bindgen",
  "web-sys",
-]
-
-[[package]]
-name = "piston2d_testing"
-version = "0.1.0"
-dependencies = [
- "piston",
- "piston2d-graphics 0.45.0",
- "piston2d-opengl_graphics",
- "piston_window",
- "pistoncore-glutin_window 0.73.2",
- "rand",
- "serde",
- "serde_json",
- "vector2d",
 ]
 
 [[package]]

@@ -1,6 +1,8 @@
 current state: massive mess.
 
-todo: 
+# todo: 
+- fix borrow semantics that have been avoided with clone() calls
+
 - convert the intersections to use Vector2d for all positions and vectors.
 - setup piston2d boilerplate
 - port over physics and I/O functions from main branch code.

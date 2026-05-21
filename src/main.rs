@@ -1,4 +1,6 @@
 mod mirror;
+mod physics;
+mod ray;
 
 extern crate glutin_window;
 extern crate graphics;
@@ -6,21 +8,41 @@ extern crate opengl_graphics;
 extern crate piston;
 extern crate vector2d;
 
-use glutin_window::GlutinWindow as Window;
-use graphics::math::Matrix2d;
+use glutin_window::GlutinWindow;
 use opengl_graphics::{GlGraphics, OpenGL};
 use piston::event_loop::{EventSettings, Events};
 use piston::input::{RenderArgs, RenderEvent, UpdateArgs, UpdateEvent};
 use piston::window::WindowSettings;
+use piston_window::*;
 use vector2d::Vector2D;
+
+/*
+Note on the structure of rendered_generations:
+the structure of rendered_generations is actually (pseudocode):
+Vec <
+    Vec <
+        start_point
+        end_point
+        color
+        >
+    >
+
+*/
+
+const MAX_REFLECTIONS: i32 = 5;
+const RAY_COUNT: i32 = 21;
 
 pub struct App {
     gl: GlGraphics,
-    reflection_counter: i32,
     mirrors: Vec<mirror::Mirror>,
     mouse_pos: Vector2D<f64>,
-    rays: Vec<mirror::Ray>,
     clear_window: bool,
+    window_size: Size,
+    randomize_mirrors: bool,
+    reset_rays: bool,
+    generations: Vec<Vec<ray::Ray>>,
+    rendered_generations: Vec<Vec<physics::Segment>>,
+    reflections: i32,
 }
 
 impl App {
@@ -33,6 +55,7 @@ impl App {
             x: args.window_size[0],
             y: args.window_size[1],
         };
+        self.window_size = args.window_size.into();
 
         // draw call
         self.gl
@@ -42,35 +65,108 @@ impl App {
                 // clear screen?
                 if self.clear_window {
                     clear(color::BLACK, gl);
+                    self.clear_window = false;
+                }
 
-                    line_from_to(color::WHITE, 3.0, [1.0, 1.0], [100.0, 100.0], transform, gl);
+                // render mirrors
+                for mirror in self.mirrors.clone() {
+                    let p1 = [mirror.start_pos.x, mirror.start_pos.y];
+                    let p2 = [mirror.end_pos.x, mirror.end_pos.y];
+                    line_from_to(mirror.color, 1.0, p1, p2, transform, gl);
+                }
+
+                // render rays
+                for segment_gen in self.rendered_generations.clone() {
+                    for segment in segment_gen {
+                        let p1 = [segment.start_pos.x, segment.start_pos.y];
+                        let p2 = [segment.end_pos.x, segment.end_pos.y];
+                        line_from_to(segment.color, 1.0, p1, p2, transform, gl);
+                    }
                 }
             })
     }
 
     // main update function.
-    fn update(&mut self, args: &UpdateArgs) {}
+    fn update(&mut self, args: &UpdateArgs) {
+        // randomize mirrors, using generate_rand function.
+        if self.randomize_mirrors {
+            self.randomize_mirrors = false;
+            self.mirrors = mirror::generate_rand(
+                10,
+                Vector2D {
+                    x: self.window_size.width,
+                    y: self.window_size.height,
+                },
+            );
+        }
+
+        if self.reset_rays {
+            self.reset_rays = false;
+            // reset reflection count
+            self.reflections = 0;
+            // reset generations
+            self.generations = vec![ray::Ray::generate_radial(RAY_COUNT, self.mouse_pos)];
+            self.rendered_generations = Vec::new();
+        } else if self.reflections >= MAX_REFLECTIONS {
+            return;
+        } else {
+            self.reflections += 1;
+            // get current iteration
+            let rays = self.generations.last().unwrap().clone();
+
+            // calculate next iteration, get current generation's segments to be rendered
+            let (next_gen, segments) = physics::physics(rays, self.mirrors.clone(), 0.00001);
+            self.generations.push(next_gen);
+            self.rendered_generations.push(segments); // create new generation.
+        }
+    }
 }
 
+/* messy entrypoint function. currently contains logic that shouldn't live there.
+Currently:
+- runs initialization code
+- has some state variables
+- contains event loop
+
+
+ */
 fn main() {
     // change to OpenGL::V2_1 if no workey
     let gl = OpenGL::V3_2;
 
     // create Glutin Window
-    let mut window: Window = WindowSettings::new("test123", [200; 2])
+    let mut window: PistonWindow<GlutinWindow> = WindowSettings::new("test123", [1000; 2])
         .graphics_api(gl)
         .exit_on_esc(true)
         .build()
         .unwrap();
 
+    let window_size = window.window.draw_size();
+
     // create a new App instance.
     let mut app = App {
         gl: GlGraphics::new(gl),
-        reflection_counter: 0,
-        mirrors: vec![mirror::Mirror {}],
+        mirrors: mirror::generate_rand(
+            10,
+            Vector2D {
+                x: window_size.width,
+                y: window_size.height,
+            },
+        ),
         mouse_pos: vector2d::Vector2D::<f64> { x: 0f64, y: 0f64 },
-        rays: vec![mirror::Ray {}],
         clear_window: true,
+        window_size,
+        randomize_mirrors: true,
+        reset_rays: true,
+        generations: vec![ray::Ray::generate_radial(
+            11,
+            Vector2D {
+                x: window_size.width / 2.0,
+                y: window_size.height / 2.0,
+            },
+        )],
+        rendered_generations: Vec::new(),
+        reflections: 0,
     };
 
     let mut events = Events::new(EventSettings::new());
@@ -82,6 +178,23 @@ fn main() {
 
         if let Some(args) = e.update_args() {
             app.update(&args);
+        }
+
+        if let Some(args) = e.press_args() {
+            use piston_window::Button::Keyboard;
+
+            if args == Keyboard(Key::Return) {
+                app.randomize_mirrors = true;
+                app.clear_window = true;
+            }
+            if args == Keyboard(Key::Space) {
+                app.clear_window = true;
+                app.reset_rays = true;
+            }
+        }
+
+        if let Some(args) = e.mouse_cursor_args() {
+            app.mouse_pos = Vector2D::from(args);
         }
     }
 }
