@@ -1,6 +1,4 @@
 use std::ops::Mul;
-
-use graphics::color;
 use vector2d::Vector2D;
 
 extern crate graphics;
@@ -48,7 +46,7 @@ impl Ray {
             res.push(Ray {
                 start_pos: origin,
                 vector,
-                color: graphics::color::YELLOW,
+                color: [1.0, 1.0, 0.2, 0.005],
             })
         }
         res

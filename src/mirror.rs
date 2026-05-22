@@ -1,5 +1,7 @@
 //use pathlib::Path;
+use crate::io;
 use crate::ray::Ray;
+use graphics::color;
 use rand::prelude::*;
 use std::ops::{Mul, Range};
 use vector2d::Vector2D;
@@ -84,6 +86,38 @@ pub fn generate_rand(count: i32, window_dimensions: Vector2D<f64>) -> Vec<Mirror
             color,
         })
     }
+
+    mirrors
+}
+
+pub fn generate_json(path: &str) -> Vec<Mirror> {
+    // for now this only accepts pixel dimensions
+    let mirrors: Vec<Mirror>;
+
+    let json_data = io::read_json(path);
+
+    let coord_format = "pixels";
+
+    let mirrors_from_json = &json_data.mirrors;
+
+    mirrors = mirrors_from_json
+        .iter()
+        .map(|mirror| Mirror {
+            start_pos: Vector2D {
+                x: mirror.start_pos[0],
+                y: mirror.start_pos[1],
+            },
+            end_pos: Vector2D {
+                x: mirror.end_pos[0],
+                y: mirror.end_pos[1],
+            },
+            unit_vec: Vector2D {
+                x: mirror.end_pos[0] - mirror.start_pos[0],
+                y: mirror.end_pos[1] - mirror.start_pos[1],
+            },
+            color: color::WHITE,
+        })
+        .collect();
 
     mirrors
 }

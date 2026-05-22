@@ -1,3 +1,4 @@
+mod io;
 mod mirror;
 mod physics;
 mod ray;
@@ -29,8 +30,8 @@ Vec <
 
 */
 
-const MAX_REFLECTIONS: i32 = 5;
-const RAY_COUNT: i32 = 21;
+const MAX_REFLECTIONS: i32 = 10;
+const RAY_COUNT: i32 = 10000;
 
 pub struct App {
     gl: GlGraphics,
@@ -62,11 +63,7 @@ impl App {
             .draw(args.viewport(), |c: Context, gl: &mut GlGraphics| {
                 let transform = c.transform;
 
-                // clear screen?
-                if self.clear_window {
-                    clear(color::BLACK, gl);
-                    self.clear_window = false;
-                }
+                clear(color::BLACK, gl);
 
                 // render mirrors
                 for mirror in self.mirrors.clone() {
@@ -80,7 +77,7 @@ impl App {
                     for segment in segment_gen {
                         let p1 = [segment.start_pos.x, segment.start_pos.y];
                         let p2 = [segment.end_pos.x, segment.end_pos.y];
-                        line_from_to(segment.color, 1.0, p1, p2, transform, gl);
+                        line_from_to(segment.color, 0.02, p1, p2, transform, gl);
                     }
                 }
             })
@@ -135,7 +132,7 @@ fn main() {
     let gl = OpenGL::V3_2;
 
     // create Glutin Window
-    let mut window: PistonWindow<GlutinWindow> = WindowSettings::new("test123", [1000; 2])
+    let mut window: PistonWindow<GlutinWindow> = WindowSettings::new("test123", [1920, 1080])
         .graphics_api(gl)
         .exit_on_esc(true)
         .build()
@@ -146,17 +143,11 @@ fn main() {
     // create a new App instance.
     let mut app = App {
         gl: GlGraphics::new(gl),
-        mirrors: mirror::generate_rand(
-            10,
-            Vector2D {
-                x: window_size.width,
-                y: window_size.height,
-            },
-        ),
+        mirrors: mirror::generate_json("assets/mirrors.json"),
         mouse_pos: vector2d::Vector2D::<f64> { x: 0f64, y: 0f64 },
         clear_window: true,
         window_size,
-        randomize_mirrors: true,
+        randomize_mirrors: false,
         reset_rays: true,
         generations: vec![ray::Ray::generate_radial(
             11,
@@ -184,11 +175,10 @@ fn main() {
             use piston_window::Button::Keyboard;
 
             if args == Keyboard(Key::Return) {
-                app.randomize_mirrors = true;
-                app.clear_window = true;
+                //app.randomize_mirrors = true;
+                app.reset_rays = true;
             }
             if args == Keyboard(Key::Space) {
-                app.clear_window = true;
                 app.reset_rays = true;
             }
         }
